@@ -147,6 +147,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3
         with:
+          name: 'Evolution API Desktop ${{ github.ref_name }}'
           files: artifacts/*
           overwrite_files: true
           body: |
@@ -159,6 +160,6 @@ jobs:
             - macOS Intel: `evolution-api-mac-x64.tar.gz`
             - macOS Apple Silicon: `evolution-api-mac-arm64.tar.gz`
 
-            O instalador cria atalhos e desinstalador. Os dados ficam em `%APPDATA%\evolution-api` e são preservados por padrão.
+            O instalador inicia o app sem console e abre o manager automaticamente. Os dados ficam em `%APPDATA%\evolution-api` e são preservados por padrão.
 
             > O instalador não é assinado digitalmente; o Windows SmartScreen pode exibir um aviso. Clique em "Mais informações" > "Executar assim mesmo".

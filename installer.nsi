@@ -2,7 +2,7 @@ Unicode true
 ManifestDPIAware true
 
 !ifndef VERSION
-  !define VERSION "2.3.7"
+  !define VERSION "2.3.8"
 !endif
 
 !ifndef SRCDIR
@@ -28,7 +28,7 @@ VIAddVersionKey "LegalCopyright" "Evolution API"
 
 !include "MUI2.nsh"
 !define MUI_ABORTWARNING
-!define MUI_FINISHPAGE_RUN "$INSTDIR\start.bat"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\start-hidden.vbs"
 !define MUI_FINISHPAGE_RUN_TEXT "Iniciar o Evolution API agora"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\LEIA-ME.txt"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Abrir instrucoes (LEIA-ME)"
@@ -48,9 +48,13 @@ Section "Evolution API" SecMain
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\Evolution API"
-  CreateShortCut "$SMPROGRAMS\Evolution API\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  CreateShortCut "$SMPROGRAMS\Evolution API\Evolution API.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\start-hidden.vbs"' "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
   WriteINIStr "$SMPROGRAMS\Evolution API\Evolution API Manager.url" "InternetShortcut" "URL" "http://127.0.0.1:8080/manager"
-  CreateShortCut "$DESKTOP\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  CreateShortCut "$SMPROGRAMS\Evolution API\Chave da API.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\mostrar-chave.vbs"' "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  CreateShortCut "$SMPROGRAMS\Evolution API\Parar Evolution API.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\stop.vbs"' "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  CreateShortCut "$SMPROGRAMS\Evolution API\Evolution API (console).lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  CreateShortCut "$DESKTOP\Evolution API.lnk" "$SYSDIR\wscript.exe" '"$INSTDIR\start-hidden.vbs"' "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
+  WriteINIStr "$DESKTOP\Evolution API Manager.url" "InternetShortcut" "URL" "http://127.0.0.1:8080/manager"
 
   WriteRegStr HKCU "Software\EvolutionAPI" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EvolutionAPI" "DisplayName" "Evolution API"
@@ -64,9 +68,27 @@ Section "Evolution API" SecMain
 SectionEnd
 
 Section "Uninstall"
+  CreateDirectory "$APPDATA\evolution-api"
+  ClearErrors
+  FileOpen $0 "$APPDATA\evolution-api\stop.request" w
+  FileClose $0
+  Sleep 4000
+  IfFileExists "$APPDATA\evolution-api\launcher.pid" 0 no_pid
+    FileOpen $0 "$APPDATA\evolution-api\launcher.pid" r
+    FileRead $0 $1
+    FileClose $0
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /PID $1 /T /F'
+  no_pid:
+  Delete "$APPDATA\evolution-api\stop.request"
+  Delete "$APPDATA\evolution-api\launcher.pid"
+
   Delete "$DESKTOP\Evolution API.lnk"
+  Delete "$DESKTOP\Evolution API Manager.url"
   Delete "$SMPROGRAMS\Evolution API\Evolution API.lnk"
   Delete "$SMPROGRAMS\Evolution API\Evolution API Manager.url"
+  Delete "$SMPROGRAMS\Evolution API\Chave da API.lnk"
+  Delete "$SMPROGRAMS\Evolution API\Parar Evolution API.lnk"
+  Delete "$SMPROGRAMS\Evolution API\Evolution API (console).lnk"
   RMDir "$SMPROGRAMS\Evolution API"
 
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EvolutionAPI"

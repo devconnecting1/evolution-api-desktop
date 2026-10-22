@@ -1,6 +1,7 @@
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const http = require('node:http');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
@@ -53,6 +54,48 @@ function getFreePort(startPort) {
   });
 }
 
+function waitForServer(url, timeoutMs) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+
+    const attempt = () => {
+      const request = http.get(url, (response) => {
+        response.resume();
+        resolve(true);
+      });
+
+      request.once('error', () => {
+        if (Date.now() - startedAt >= timeoutMs) {
+          resolve(false);
+          return;
+        }
+
+        setTimeout(attempt, 1000);
+      });
+
+      request.setTimeout(2000, () => request.destroy());
+    };
+
+    attempt();
+  });
+}
+
+function openBrowser(url) {
+  const command = process.platform === 'win32' ? 'cmd.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+
+  try {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+
+    child.once('error', () => {});
+    child.unref();
+  } catch {}
+}
+
 async function ensureDatabase(pg) {
   const client = pg.getPgClient('postgres');
 
@@ -103,8 +146,22 @@ async function runMigrations(env) {
 
 async function main() {
   const dataDir = getDataDir();
+  const pidFile = path.join(dataDir, 'launcher.pid');
+  const stopFile = path.join(dataDir, 'stop.request');
 
   fs.mkdirSync(dataDir, { recursive: true });
+
+  try {
+    fs.unlinkSync(stopFile);
+  } catch {}
+
+  fs.writeFileSync(pidFile, String(process.pid));
+
+  process.once('exit', () => {
+    try {
+      fs.unlinkSync(pidFile);
+    } catch {}
+  });
 
   const configFile = path.join(dataDir, 'config.json');
   const config = readJson(configFile);
@@ -197,9 +254,29 @@ async function main() {
     process.exit(code);
   };
 
+  const stopWatcher = setInterval(() => {
+    if (!fs.existsSync(stopFile)) {
+      return;
+    }
+
+    clearInterval(stopWatcher);
+
+    try {
+      fs.unlinkSync(stopFile);
+    } catch {}
+
+    stop(0);
+  }, 1000);
+
   server.once('exit', (code) => stop(code ?? 0));
   process.once('SIGINT', () => stop(0));
   process.once('SIGTERM', () => stop(0));
+
+  waitForServer(`http://127.0.0.1:${apiPort}/manager`, 60000).then((ready) => {
+    if (ready) {
+      openBrowser(`http://127.0.0.1:${apiPort}/manager`);
+    }
+  });
 }
 
 main().catch((error) => {

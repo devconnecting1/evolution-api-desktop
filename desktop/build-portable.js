@@ -55,6 +55,8 @@ exec "$DIR/runtime/node" "$DIR/desktop/launcher.js"
 `;
 
 const windowsLauncher = `@echo off
+title Evolution API
+cd /d "%~dp0"
 "%~dp0runtime\\node.exe" "%~dp0desktop\\launcher.js"
 if errorlevel 1 pause
 `;
@@ -64,9 +66,20 @@ const readme = `Evolution API - pacote portatil
 Como usar:
 1. Extraia todo o conteudo do arquivo.
 2. Linux/macOS: execute ./start.sh (ou Iniciar.command no macOS).
-   Windows: execute start.bat.
-3. Abra http://127.0.0.1:8080/manager no navegador.
-4. A chave da API sera exibida no terminal e salva em config.json na pasta de dados.
+   Windows: execute start-hidden.vbs para iniciar sem console e abrir o manager.
+   Para diagnostico, use start.bat (modo console).
+3. O manager abre automaticamente em http://127.0.0.1:8080/manager.
+   Se precisar, abra a URL manualmente no navegador.
+4. A chave da API fica salva em config.json na pasta de dados.
+   No Windows, execute mostrar-chave.vbs para exibir e copiar a chave.
+   Para encerrar o app no Windows, execute stop.vbs.
+
+Atalhos criados pelo instalador no Windows:
+- Evolution API: inicia sem console e abre o manager.
+- Evolution API Manager: abre o manager no navegador.
+- Chave da API: mostra e copia a chave.
+- Parar Evolution API: encerra o app.
+- Evolution API (console): modo diagnostico com a janela preta.
 
 O pacote inclui Node.js, Evolution API e PostgreSQL. Nao e necessario instalar npm, Docker ou banco de dados.
 Redis nao e necessario; o cache local e usado automaticamente.
@@ -83,6 +96,10 @@ Dados persistidos:
 `;
 
 if (process.platform === 'win32') {
+  for (const file of ['start-hidden.vbs', 'stop.vbs', 'mostrar-chave.vbs']) {
+    fs.copyFileSync(path.join(__dirname, 'windows', file), path.join(stage, file));
+  }
+
   write(path.join(stage, 'start.bat'), windowsLauncher);
 } else {
   write(path.join(stage, 'start.sh'), unixLauncher, 0o755);
