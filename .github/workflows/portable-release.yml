@@ -84,7 +84,7 @@ jobs:
           STAGE_DIR: ${{ github.workspace }}/stage
 
       - name: Prune package dependencies
-        run: npm prune --omit=dev --prefix stage
+        run: npm prune --omit=dev --prefix stage --legacy-peer-deps --allow-git=all
 
       - name: Archive package (Unix)
         if: runner.os != 'Windows'
