@@ -1,27 +1,42 @@
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService, S3 } from '@config/env.config';
 import { Logger } from '@config/logger.config';
 import { BadRequestException } from '@exceptions';
-import * as MinIo from 'minio';
-import { join } from 'path';
+import { posix } from 'path';
 import { Readable, Transform } from 'stream';
 
 const logger = new Logger('S3 Service');
 
 const BUCKET = new ConfigService().get<S3>('S3');
 
-interface Metadata extends MinIo.ItemBucketMetadata {
+interface Metadata extends Record<string, string> {
   'Content-Type': string;
 }
 
-const minioClient = (() => {
+const s3Client = (() => {
   if (BUCKET?.ENABLE) {
-    return new MinIo.Client({
-      endPoint: BUCKET.ENDPOINT,
-      port: BUCKET.PORT,
-      useSSL: BUCKET.USE_SSL,
-      accessKey: BUCKET.ACCESS_KEY,
-      secretKey: BUCKET.SECRET_KEY,
-      region: BUCKET.REGION,
+    const protocol = BUCKET.USE_SSL ? 'https' : 'http';
+    const endpoint = BUCKET.PORT
+      ? `${protocol}://${BUCKET.ENDPOINT}:${BUCKET.PORT}`
+      : `${protocol}://${BUCKET.ENDPOINT}`;
+
+    return new S3Client({
+      endpoint,
+      region: BUCKET.REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: BUCKET.ACCESS_KEY,
+        secretAccessKey: BUCKET.SECRET_KEY,
+      },
+      forcePathStyle: true,
     });
   }
 })();
@@ -29,10 +44,10 @@ const minioClient = (() => {
 const bucketName = BUCKET.BUCKET_NAME;
 
 const bucketExists = async () => {
-  if (minioClient) {
+  if (s3Client) {
     try {
-      const list = await minioClient.listBuckets();
-      return list.find((bucket) => bucket.name === bucketName);
+      await s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
+      return true;
     } catch {
       return false;
     }
@@ -40,7 +55,7 @@ const bucketExists = async () => {
 };
 
 const setBucketPolicy = async () => {
-  if (minioClient) {
+  if (s3Client) {
     const policy = {
       Version: '2012-10-17',
       Statement: [
@@ -52,16 +67,21 @@ const setBucketPolicy = async () => {
         },
       ],
     };
-    await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
+    await s3Client.send(
+      new PutBucketPolicyCommand({
+        Bucket: bucketName,
+        Policy: JSON.stringify(policy),
+      }),
+    );
   }
 };
 
 const createBucket = async () => {
-  if (minioClient) {
+  if (s3Client) {
     try {
       const exists = await bucketExists();
       if (!exists) {
-        await minioClient.makeBucket(bucketName);
+        await s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
       }
       if (!BUCKET.SKIP_POLICY) {
         await setBucketPolicy();
@@ -78,12 +98,27 @@ const createBucket = async () => {
 
 createBucket();
 
+const putObject = async (objectName: string, file: Buffer | Transform | Readable, size: number, metadata: Metadata) => {
+  if (s3Client) {
+    const { 'Content-Type': contentType, ...customMetadata } = metadata;
+    return await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: objectName,
+        Body: file,
+        ContentLength: size,
+        ContentType: contentType,
+        Metadata: { ...customMetadata, 'custom-header-application': 'evolution-api' },
+      }),
+    );
+  }
+};
+
 const uploadFile = async (fileName: string, file: Buffer | Transform | Readable, size: number, metadata: Metadata) => {
-  if (minioClient) {
-    const objectName = join('evolution-api', fileName);
+  if (s3Client) {
+    const objectName = posix.join('evolution-api', fileName);
     try {
-      metadata['custom-header-application'] = 'evolution-api';
-      return await minioClient.putObject(bucketName, objectName, file, size, metadata);
+      return await putObject(objectName, file, size, metadata);
     } catch (error) {
       logger.error(error);
       return error;
@@ -92,15 +127,14 @@ const uploadFile = async (fileName: string, file: Buffer | Transform | Readable,
 };
 
 const getObjectUrl = async (fileName: string, expiry?: number) => {
-  if (minioClient) {
+  if (s3Client) {
     try {
-      const objectName = join('evolution-api', fileName);
-      if (expiry) {
-        return await minioClient.presignedGetObject(bucketName, objectName, expiry);
-      }
-      return await minioClient.presignedGetObject(bucketName, objectName);
+      const objectName = posix.join('evolution-api', fileName);
+      const expiresIn = Math.min(expiry || 7 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+
+      return await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: bucketName, Key: objectName }), { expiresIn });
     } catch (error) {
-      throw new BadRequestException(error?.message);
+      throw new BadRequestException((error as Error)?.message);
     }
   }
 };
@@ -112,11 +146,10 @@ const uploadTempFile = async (
   size: number,
   metadata: Metadata,
 ) => {
-  if (minioClient) {
-    const objectName = join(folder, fileName);
+  if (s3Client) {
+    const objectName = posix.join(folder, fileName);
     try {
-      metadata['custom-header-application'] = 'evolution-api';
-      return await minioClient.putObject(bucketName, objectName, file, size, metadata);
+      return await putObject(objectName, file, size, metadata);
     } catch (error) {
       logger.error(error);
       return error;
@@ -125,10 +158,10 @@ const uploadTempFile = async (
 };
 
 const deleteFile = async (folder: string, fileName: string) => {
-  if (minioClient) {
-    const objectName = join(folder, fileName);
+  if (s3Client) {
+    const objectName = posix.join(folder, fileName);
     try {
-      return await minioClient.removeObject(bucketName, objectName);
+      return await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: objectName }));
     } catch (error) {
       logger.error(error);
       return error;

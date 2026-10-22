@@ -14,7 +14,7 @@
     "lint:check": "eslint --ext .ts src",
     "format": "prettier --write --parser babel \"desktop/**/*.js\" && prettier --write --parser yaml \".github/workflows/check_code_quality.yml\" \".github/workflows/portable-release.yml\" \"docker-compose.local.yaml\"",
     "format:check": "prettier --check --parser babel \"desktop/**/*.js\" && prettier --check --parser yaml \".github/workflows/check_code_quality.yml\" \".github/workflows/portable-release.yml\" \"docker-compose.local.yaml\"",
-    "commit": "cz",
+    "commit": "czg",
     "commitlint": "commitlint --edit",
     "db:generate": "node runWithProvider.js \"npx prisma generate --schema ./prisma/DATABASE_PROVIDER-schema.prisma\"",
     "db:deploy": "node runWithProvider.js \"rm -rf ./prisma/migrations && cp -r ./prisma/DATABASE_PROVIDER-migrations ./prisma/migrations && npx prisma migrate deploy --schema ./prisma/DATABASE_PROVIDER-schema.prisma\"",
@@ -61,16 +61,13 @@
       "sh -c 'tsc --noEmit'"
     ]
   },
-  "config": {
-    "commitizen": {
-      "path": "cz-conventional-changelog"
-    }
-  },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
-    "@aws-sdk/client-sqs": "^3.891.0",
+    "@aws-sdk/client-s3": "^3.1155.0",
+    "@aws-sdk/client-sqs": "^3.1155.0",
+    "@aws-sdk/s3-request-presigner": "^3.1155.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@figuro/chatwoot-sdk": "^1.1.16",
+    "@figuro/chatwoot-sdk": "^1.1.17",
     "@hapi/boom": "^10.0.1",
     "@paralleldrive/cuid2": "^2.2.2",
     "@prisma/client": "^6.16.2",
@@ -106,11 +103,10 @@
     "mediainfo.js": "^0.3.4",
     "mime": "^4.0.0",
     "mime-types": "^2.1.35",
-    "minio": "^8.0.3",
     "multer": "^2.4.0",
     "nats": "^2.29.1",
     "node-cache": "^5.1.2",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.6.0",
     "openai": "^4.77.3",
     "pg": "^8.13.1",
     "pino": "^9.10.0",
@@ -121,13 +117,12 @@
     "redis": "^4.7.0",
     "rxjs": "^7.8.2",
     "sharp": "^0.35.5",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
     "socks-proxy-agent": "^8.0.5",
     "swagger-ui-express": "^5.0.1",
-    "tsup": "^8.3.5",
     "undici": "^7.30.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.2"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
@@ -139,38 +134,61 @@
     "@types/mime": "^4.0.0",
     "@types/mime-types": "^2.1.4",
     "@types/node": "^24.5.2",
-    "@types/node-cron": "^3.0.11",
     "@types/qrcode": "^1.5.5",
     "@types/qrcode-terminal": "^0.12.2",
-    "@typescript-eslint/eslint-plugin": "^8.44.0",
-    "@typescript-eslint/parser": "^8.44.0",
-    "commitizen": "^4.3.1",
-    "cz-conventional-changelog": "^3.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.0",
+    "czg": "^1.14.0",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.6",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.4.2",
     "tsconfig-paths": "^4.2.0",
+    "tsup": "^9.0.0",
     "tsx": "^4.20.5",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "axios": "$axios",
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2",
+      "effect": "^3.22.3"
+    },
+    "ajv@^6.0.0": "6.15.0",
+    "ajv@^8.0.0": "8.20.0",
+    "brace-expansion@^1.0.0": "1.1.21",
+    "brace-expansion@^2.0.0": "2.1.7",
+    "defu": "^6.1.7",
+    "external-editor": {
+      "tmp": "^0.2.7"
+    },
+    "fast-xml-parser": "^5.11.2",
+    "flatted": "^3.4.4",
+    "jws": "^3.2.3",
+    "lodash": "^4.18.1",
+    "minimatch@^3.0.0": "3.1.5",
+    "minimatch@^9.0.0": "9.0.9",
+    "picomatch@^2.0.0": "2.3.2",
+    "picomatch@^4.0.0": "4.0.7",
+    "ws": "^8.22.0",
+    "yaml": "^2.9.1"
   },
   "allowScripts": {
     "@ffmpeg-installer/linux-x64@4.1.0": true,
     "@prisma/client@6.19.0": true,
     "@prisma/engines@6.19.0": true,
-    "baileys@7.0.0-rc.9": true,
-    "esbuild@0.27.0": true,
-    "esbuild@0.25.12": true,
-    "protobufjs@6.8.8": true,
-    "protobufjs@7.5.4": true,
     "prisma@6.19.0": true,
     "sharp@0.34.5": true,
     "@scarf/scarf": false,
     "embedded-postgres@17.10.0-beta.17": true,
-    "@embedded-postgres/linux-x64@17.10.0-beta.17": true
+    "@embedded-postgres/linux-x64@17.10.0-beta.17": true,
+    "baileys@7.0.0-rc14": true,
+    "protobufjs@7.6.6": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
   }
 }
