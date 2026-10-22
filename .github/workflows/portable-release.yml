@@ -1,0 +1,108 @@
+name: Portable Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: windows-latest
+            platform: win-x64
+          - os: macos-13
+            platform: mac-x64
+          - os: macos-14
+            platform: mac-arm64
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+
+      - name: Install npm
+        run: npm install -g npm@12
+
+      - name: Allow git dependencies
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Install packages
+        run: npm ci --allow-git=all
+
+      - name: Approve install scripts
+        run: |
+          npm install-scripts approve --all
+          npm install-scripts deny @scarf/scarf
+          npm rebuild
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_PROVIDER: postgresql
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_PROVIDER: postgresql
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev
+
+      - name: Create portable package
+        run: node desktop/build-portable.js
+        env:
+          STAGE_DIR: ${{ github.workspace }}/stage
+
+      - name: Archive package (Unix)
+        if: runner.os != 'Windows'
+        run: tar -czf "evolution-api-${{ matrix.platform }}.tar.gz" -C stage .
+
+      - name: Archive package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path stage\* -DestinationPath "evolution-api-${{ matrix.platform }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evolution-api-${{ matrix.platform }}
+          path: evolution-api-${{ matrix.platform }}.*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

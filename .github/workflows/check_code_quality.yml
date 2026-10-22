@@ -1,42 +1,64 @@
 name: Check Code Quality
 
-on: 
+on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   check-lint-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
-    - uses: actions/checkout@v5
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
 
-    - name: Install Node
-      uses: actions/setup-node@v5
-      with:
-        node-version: 20.x
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
 
-    - name: Cache node modules
-      uses: actions/cache@v4
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+      - name: Install npm
+        run: npm install -g npm@12
 
-    - name: Install packages
-      run: npm ci
-    
-    - name: Check linting
-      run: npm run lint:check
+      - name: Allow git dependencies
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
 
-    - name: Generate Prisma client
-      run: npm run db:generate
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-    - name: Check build
-      run: npm run build
+      - name: Install packages
+        run: npm ci --allow-git=all
+
+      - name: Approve install scripts
+        run: |
+          npm install-scripts approve --all
+          npm install-scripts deny @scarf/scarf
+          npm rebuild
+
+      - name: Check linting
+        run: npm run lint:check
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_PROVIDER: postgresql
+
+      - name: Check build
+        run: npm run build
+        env:
+          DATABASE_PROVIDER: postgresql

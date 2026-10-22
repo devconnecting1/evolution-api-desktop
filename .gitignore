@@ -40,6 +40,7 @@ lerna-debug.log*
 *.env
 
 /temp/*
+/portable/
 
 .DS_Store
 *.DS_Store
