@@ -5,6 +5,10 @@ ManifestDPIAware true
   !define VERSION "2.3.7"
 !endif
 
+!ifndef SRCDIR
+  !define SRCDIR "stage"
+!endif
+
 Name "Evolution API"
 OutFile "EvolutionAPI-Setup-${VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\EvolutionAPI"
@@ -40,13 +44,13 @@ VIAddVersionKey "LegalCopyright" "Evolution API"
 Section "Evolution API" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
-  File /r "stage/*"
+  File /r "${SRCDIR}\*.*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\Evolution API"
-  CreateShortCut "$SMPROGRAMS\Evolution API\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED
+  CreateShortCut "$SMPROGRAMS\Evolution API\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
   WriteINIStr "$SMPROGRAMS\Evolution API\Evolution API Manager.url" "InternetShortcut" "URL" "http://127.0.0.1:8080/manager"
-  CreateShortCut "$DESKTOP\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED
+  CreateShortCut "$DESKTOP\Evolution API.lnk" "$INSTDIR\start.bat" "" "$INSTDIR\Uninstall.exe" 0 SW_SHOWMINIMIZED "$INSTDIR"
 
   WriteRegStr HKCU "Software\EvolutionAPI" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EvolutionAPI" "DisplayName" "Evolution API"

@@ -90,12 +90,22 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install nsis -y --no-progress
 
+      - name: Verify portable stage
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:GITHUB_WORKSPACE 'stage'
+          if (-not (Test-Path $stage)) { throw "Stage directory not found: $stage" }
+          Get-ChildItem -Force $stage | Select-Object -First 15 Name, Length
+          "Total files: $((Get-ChildItem -Recurse -File $stage | Measure-Object).Count)"
+
       - name: Build Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$version installer.nsi
+          $stage = Join-Path $env:GITHUB_WORKSPACE 'stage'
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$version /DSRCDIR=$stage installer.nsi
 
       - name: Archive package (Unix)
         if: runner.os != 'Windows'
