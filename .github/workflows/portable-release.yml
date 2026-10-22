@@ -86,6 +86,17 @@ jobs:
       - name: Prune package dependencies
         run: npm prune --omit=dev --prefix stage --legacy-peer-deps --allow-git=all
 
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis -y --no-progress
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$version installer.nsi
+
       - name: Archive package (Unix)
         if: runner.os != 'Windows'
         run: tar -czf "evolution-api-${{ matrix.platform }}.tar.gz" -C stage .
@@ -99,6 +110,14 @@ jobs:
         with:
           name: evolution-api-${{ matrix.platform }}
           path: evolution-api-${{ matrix.platform }}.*
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: evolution-api-win-x64-installer
+          path: EvolutionAPI-Setup-*.exe
           if-no-files-found: error
 
   release:
@@ -119,4 +138,17 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
-          generate_release_notes: true
+          overwrite_files: true
+          body: |
+            ## Evolution API Desktop ${{ github.ref_name }}
+
+            ### Downloads
+            - Windows (instalador): `EvolutionAPI-Setup-*.exe`
+            - Windows (portátil): `evolution-api-win-x64.zip`
+            - Linux x64: `evolution-api-linux-x64.tar.gz`
+            - macOS Intel: `evolution-api-mac-x64.tar.gz`
+            - macOS Apple Silicon: `evolution-api-mac-arm64.tar.gz`
+
+            O instalador cria atalhos e desinstalador. Os dados ficam em `%APPDATA%\evolution-api` e são preservados por padrão.
+
+            > O instalador não é assinado digitalmente; o Windows SmartScreen pode exibir um aviso. Clique em "Mais informações" > "Executar assim mesmo".
